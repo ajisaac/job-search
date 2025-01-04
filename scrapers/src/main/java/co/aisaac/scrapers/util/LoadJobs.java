@@ -1,27 +1,29 @@
-package co.aisaac.webapp.util;
+package co.aisaac.scrapers.util;
 
+import co.aisaac.scrapers.Database;
 import co.aisaac.webapp.Job;
-import co.aisaac.webapp.JobRepo;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
+import java.time.LocalDate;
 
-// todo give a psvm method
-// can run this as scheduled if we need to load this again
 public class LoadJobs {
 
-//    @Autowired
-    private JobRepo jobRepo;
+    Database db = new Database();
 
-    public void loadJobs() {
+    public static void main(String[] args) {
+        LoadJobs loadJobs = new LoadJobs();
+        loadJobs.run();
+    }
+
+    public void run() {
         ObjectMapper om = new ObjectMapper();
 
         try {
             File file = new File("/Users/aaron/Documents/jobs.json");
             JsonNode arrayNode = om.readTree(file);
 
-            // [subtitle, search_term, description, company, title, url, status]
             for (JsonNode node : arrayNode) {
                 Job job = new Job();
                 job.description = node.get("description").asText();
@@ -29,12 +31,10 @@ public class LoadJobs {
                 job.title = node.get("title").asText();
                 job.url = node.get("url").asText();
                 job.status = node.get("status").asText();
-                jobRepo.save(job);
-                System.out.println("done");
+                job.job_posting_date = LocalDate.parse(node.get("job_posting_date").asText());
+                job.job_site = node.get("job_site").asText();
+                db.storeJob(job);
             }
-
-            System.out.println("done");
-
 
         } catch (Exception e) {
             e.printStackTrace();

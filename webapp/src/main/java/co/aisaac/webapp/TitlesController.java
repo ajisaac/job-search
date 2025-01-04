@@ -36,8 +36,7 @@ public class TitlesController {
         }
 
         if (!filter.titleSearch.isBlank()) {
-            jobs = jobs
-                    .stream()
+            jobs = jobs.stream()
                     .filter(job -> job.title.toLowerCase().contains(filter.titleSearch.toLowerCase()))
                     .toList();
         }
