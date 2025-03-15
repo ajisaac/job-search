@@ -11,12 +11,10 @@ import java.sql.SQLException;
 
 public class Database {
 
-    private static final String URL = "jdbc:postgresql://localhost:5432/jobs";
-    private static final String USER
-            = "postgres";
-    private static final String PASSWORD = "password";
-
     private Connection getConnection() throws SQLException {
+        String URL = "jdbc:mysql://localhost:3306/db";
+        String USER = "root";
+        String PASSWORD = "password";
         return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 
@@ -55,15 +53,32 @@ public class Database {
         }
     }
 
-    public void storeJob(Job job) {
+    public boolean storeJob(Job job) {
+
+        System.out.println("Saving job - " + job.title + " - " + job.company + " - " + job.url);
 
         if (jobExists(job)) {
             System.out.println("Job already exists");
-            return;
+            return false;
         }
 
-        System.out.println("Storing job " + job.searchTerm + " - " + job.title);
+        String sql = "INSERT INTO jobs(title, url, company, description, status, " +
+                "job_site, job_posting_date) values(?, ?, ?, ?, ?, ?, ?);";
 
-        // save job todo
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, job.title);
+            stmt.setString(2, job.url);
+            stmt.setString(3, job.company);
+            stmt.setString(4, job.description);
+            stmt.setString(5, job.status);
+            stmt.setString(6, job.job_site);
+            stmt.setString(7, job.job_posting_date.toString());
+            stmt.executeUpdate();
+            return true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

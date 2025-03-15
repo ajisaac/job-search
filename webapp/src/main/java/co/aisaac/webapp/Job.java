@@ -1,19 +1,11 @@
 package co.aisaac.webapp;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.SequenceGenerator;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Transient;
 import lombok.ToString;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,12 +13,10 @@ import java.util.List;
 @Getter
 @Setter
 @Entity(name = "jobs")
-@Table(name="jobs", schema = "job_scraper")
 public class Job {
 
     @Id
-    @SequenceGenerator(name = "jobs_id_generator", sequenceName = "jobs_id_seq", allocationSize = 1)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "jobs_id_generator")
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", updatable = false, nullable = false)
     private Long id;
 
@@ -35,14 +25,9 @@ public class Job {
     public String company;
     @Transient
     public List<String> companyStatuses = new ArrayList<>();
-    public String subtitle;
     public String description;
     public String status;
 
-    @Column(name = "search_term")
-    public String searchTerm;
-
-    public String location;
     public String job_site;
-    public LocalDateTime job_posting_date;
+    public LocalDate job_posting_date;
 }

@@ -11,9 +11,7 @@
 <div class="container">
     <nav>
         <a th:href="@{/}">home</a> -
-        <a th:href="@{/titles}">titles</a> -
-        <a th:href="@{/notes}">notes</a> -
-        <a th:href="@{/sites}">sites</a>
+        <a th:href="@{/titles}">titles</a>
         <hr>
     </nav>
     <div class="filter">
@@ -50,7 +48,6 @@
             </div>
 
             <a th:href="${job.url}" th:text="${job.title}" target="_blank"></a>
-            <span th:text="${job.getSubtitle()}"></span>
         </div>
     </div>
 </div>

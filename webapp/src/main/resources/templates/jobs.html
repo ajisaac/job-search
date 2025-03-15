@@ -11,9 +11,7 @@
 <div class="container">
     <nav>
         <a th:href="@{/}">home</a> -
-        <a th:href="@{/titles}">titles</a> -
-        <a th:href="@{/notes}">notes</a> -
-        <a th:href="@{/sites}">sites</a>
+        <a th:href="@{/titles}">titles</a>
         <hr>
     </nav>
 
@@ -48,6 +46,7 @@
                                 <label for="titleSearch">Title Search</label>
                                 <input type="text" name="titleSearch" id="titleSearch" th:value="*{titleSearch}"/>
                             </div>
+                            <input type="hidden" name="jobSite" id="jobSite" th:value="*{jobSite}">
                             <input type="submit" value="Search">
                         </form>
                     </div>
@@ -56,17 +55,14 @@
                         <div class="filter__job-site-selector">
                             <a th:href="@{'/filter/job-site/all'}">All</a> -
                             <a th:href="@{'/filter/job-site/indeed'}">Indeed</a> -
+                            <a th:href="@{'/filter/job-site/angelco'}">Angel Co</a> -
+                            <a th:href="@{'/filter/job-site/we_work_remotely'}">We Work Remotely</a>
+                            <br>
+                            <a th:href="@{'/filter/job-site/hacker_news'}">Hacker News</a> -
                             <a th:href="@{'/filter/job-site/skip_the_drive'}">Skip The Drive</a> -
-                            <a th:href="@{'/filter/job-site/working_nomads'}">Working Nomads</a> -
-                            <a th:href="@{'/filter/job-site/wellfound'}">Wellfound</a><br>
-                            <a th:href="@{'/filter/job-site/remote_co'}">Remote.co</a> -
-                            <a th:href="@{'/filter/job-site/remotive'}">Remotive</a> -
-                            <a th:href="@{'/filter/job-site/remote_ok'}">RemoteOk</a> -
-                            <a th:href="@{'/filter/job-site/we_work_remotely'}">We Work Remotely</a><br>
-                            <a th:href="@{'/filter/job-site/flexjobs'}">FlexJobs</a> -
-                            <a th:href="@{'/filter/job-site/startup_jobs'}">Startup.jobs</a> -
-                            <a th:href="@{'/filter/job-site/built_in_sea'}">Built in Seattle</a> -
-                            <a th:href="@{'/filter/job-site/hacker_news'}">Hacker News</a>
+                            <a th:href="@{'/filter/job-site/working_nomads'}">Working Nomads</a>
+                            <br>
+                            <a th:href="@{'/filter/job-site/remotive'}">Remotive</a>
                         </div>
                     </div>
                 </div>
@@ -96,8 +92,6 @@
                       th:text="${status}"></span> -
 
                 </div>
-
-                <span th:text="${job.subtitle}"/>
             </div>
 
             <span class="job__actions">
@@ -151,10 +145,7 @@
         link.addEventListener("click", () => {
             fetch("/status/" + id + "/" + status,
                 {
-                    method: "POST",
-                    headers: {
-                        "X-CSRF-Token": "[[${_csrf.token}]]"
-                    }
+                    method: "POST"
                 }
             ).then(response => {
                 if (response.status === 200) {

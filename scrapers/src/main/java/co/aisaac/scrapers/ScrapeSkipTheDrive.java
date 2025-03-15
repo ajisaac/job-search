@@ -8,12 +8,13 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// todo gotta clean up this whole page
 public class ScrapeSkipTheDrive {
     private static final String url = "https://www.skipthedrive.com/";
     private final WebDriver driver;
@@ -42,7 +43,6 @@ public class ScrapeSkipTheDrive {
 
 
     private void scrape() {
-        // todo, copilot wrote this, it is odd
         int start = 1;
         Integer end = null;
         String url = prepareUrl(start);
@@ -113,16 +113,10 @@ public class ScrapeSkipTheDrive {
         if (href == null) {
             return;
         }
-        if (!db.hrefExists(href)) {
-            Job job = parseDescriptionPage(href);
-            if (job != null) {
-                System.out.println("Saving job - " + job.title);
-                saveJob(job);
-            }
+        if (db.hrefExists(href)) {
+            return;
         }
-    }
 
-    private Job parseDescriptionPage(String href) {
         Utils.sleepRandom(6);
 
         Job job = new Job();
@@ -137,31 +131,16 @@ public class ScrapeSkipTheDrive {
         WebElement compLinkElement = driver.findElement(By.className("custom_fields_company_name_display"));
         job.company = compLinkElement != null ? compLinkElement.getText().trim() : "unknown";
 
-        WebElement dateElement = driver.findElement(By.className("custom_fields_job_date_display"));
-        String date = dateElement != null ? dateElement.getText().trim() : "";
-
-        WebElement locationElement = driver.findElement(By.className("custom_fields_job_location_display"));
-        String location = locationElement != null ? locationElement.getText().trim() : "";
-
-        job.subtitle = date + " " + location;
-
         WebElement jdElement = driver.findElement(By.className("entry-content"));
         job.description = jdElement != null ? jdElement.getAttribute("innerHTML") : "No Description Found";
 
-        return job;
-    }
-
-
-    private void saveJob(Job job) {
         job.status = "new";
-        job.job_site = "skip-the-drive";
-        job.job_posting_date = LocalDateTime.now();
+        job.job_site = "skip_the_drive";
+        job.job_posting_date = LocalDate.now();
 
-        if (db.jobExists(job)) {
-            return;
-        }
         db.storeJob(job);
 
     }
+
 
 }
