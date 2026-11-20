@@ -32,6 +32,14 @@ build/
 ### VS Code ###
 .vscode/
 
+### Scraped job data (json + html files) and pages captured by the browser extension ###
+jobs/
+pages/
+companies/
+
+angel.html
+
+
 ### MISC ###
 src/main/resources/templates/notes.html
 src/main/resources/templates/sites.html

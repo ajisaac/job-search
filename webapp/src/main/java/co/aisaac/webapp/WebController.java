@@ -1,211 +1,104 @@
 package co.aisaac.webapp;
 
-import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
+import io.javalin.http.Context;
+import io.javalin.http.HttpStatus;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.regex.Pattern;
 
-@Controller
 public class WebController {
 
-    private final JobRepo jobRepo;
+    private final Jobs jobRepo;
 
-    private final MainFilter filter;
-
-    public WebController(JobRepo jobRepo) {
+    public WebController(Jobs jobRepo) {
         this.jobRepo = jobRepo;
-        this.filter = new MainFilter();
     }
 
-    @GetMapping("/")
-    public String all(Model model) {
-        List<Job> jobs = jobRepo.findAll();
-        augmentCompanies(jobs);
+    // GET /?status=new&site=all&q=java, kotlin, title: senior, company: acme
+    // The list of jobs. The selected job's details are loaded from /job/... by the page.
+    public void all(Context ctx) {
+        MainFilter filter = filter(ctx);
 
-        jobs = filterJobs(filter, jobs);
-        model.addAttribute("jobs", jobs);
-        model.addAttribute("mainFilter", filter);
+        List<Job> all = jobRepo.findAll();
+        List<Job> jobs = JobFilter.apply(all, filter);
 
-        return "jobs";
+        Map<String, Object> model = new HashMap<>();
+        model.put("jobs", jobs);
+        model.put("filter", filter);
+        model.put("statuses", Job.STATUSES);
+        model.put("sites", Job.SITES);
+        model.put("statusCounts", JobFilter.countByStatus(all, filter));
+        model.put("siteCounts", JobFilter.countBySite(all, filter));
+        // the current filters, minus the one a link changes
+        model.put("withoutStatus", "site=" + encode(filter.getJobSite()) + "&q=" + encode(filter.getQuery()));
+        model.put("withoutSite", "status=" + encode(filter.getStatus()) + "&q=" + encode(filter.getQuery()));
+
+        ctx.render("templates/jobs.html", model);
     }
 
-    @GetMapping("/filter/status/{status}")
-    public String filterStatus(@PathVariable("status") String status) {
-        filter.setStatus(status);
-        return "redirect:/";
-    }
-
-    @GetMapping("/filter/job-site/{job-site}")
-    public String filterJobSite(@PathVariable("job-site") String site) {
-        filter.setJobSite(site);
-        return "redirect:/";
-    }
-
-    @PostMapping("/")
-    public String allFiltered(MainFilter filter) {
-        this.filter.setSearchTerms(filter.getSearchTerms());
-        this.filter.setJobSite(filter.getJobSite());
-        this.filter.setCompanySearch(filter.getCompanySearch());
-        this.filter.setTitleSearch(filter.getTitleSearch());
-        return "redirect:/";
-    }
-
-    @ResponseBody
-    @PostMapping("/status/{id}/{status}")
-    public ResponseEntity<String> updateStatus(@PathVariable("id") String id, @PathVariable("status") String status) {
-        Long idd = Long.parseLong(id);
-        Optional<Job> optJob = jobRepo.findById(idd);
+    // GET /job/{site}/{name}?q=java
+    // One job's details, as an html fragment for the right hand pane. Search terms are highlighted.
+    public void detail(Context ctx) {
+        String id = ctx.pathParam("site") + "/" + ctx.pathParam("name");
+        Optional<Job> optJob = jobRepo.findById(id);
         if (optJob.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            ctx.status(HttpStatus.NOT_FOUND);
+            return;
+        }
+        Job job = optJob.get();
+
+        // the statuses of this company's other jobs, so you can see you already applied there
+        List<String> others = job.company.isBlank() ? List.of() : jobRepo.findAll().stream()
+                .filter(other -> other.company.equalsIgnoreCase(job.company) && !other.id.equals(job.id))
+                .map(other -> other.status)
+                .toList();
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("job", job);
+        model.put("description", JobFilter.highlight(job.description, filter(ctx)));
+        model.put("others", others);
+        model.put("siteLabel", Job.SITES.getOrDefault(job.job_site, job.job_site));
+        model.put("statuses", Job.STATUSES);
+        model.put("keys", Job.STATUS_KEYS);
+
+        ctx.render("templates/job.html", model);
+    }
+
+    // POST /status/{site}/{name}/{status}
+    public void updateStatus(Context ctx) {
+        String status = ctx.pathParam("status");
+        if (!Job.STATUSES.contains(status)) {
+            ctx.status(HttpStatus.BAD_REQUEST).result("Unknown status: " + status);
+            return;
+        }
+
+        String id = ctx.pathParam("site") + "/" + ctx.pathParam("name");
+        Optional<Job> optJob = jobRepo.findById(id);
+        if (optJob.isEmpty()) {
+            ctx.status(HttpStatus.NOT_FOUND);
+            return;
         }
 
         Job job = optJob.get();
-        job.setStatus(status);
+        job.status = status;
         jobRepo.save(job);
-        return ResponseEntity.ok().build();
+        ctx.status(HttpStatus.OK);
     }
 
-    private List<Job> filterJobs(MainFilter mainFilter, List<Job> all) {
-
-        // filter status
-        String status = mainFilter.getStatus();
-        List<Job> filtered = new ArrayList<>(all);
-        filtered = filtered.stream()
-                .filter(job -> job.status.trim().equalsIgnoreCase(status.trim()))
-                .toList();
-
-        // filter job site
-        String jobSite = mainFilter.getJobSite();
-        if (!jobSite.equals("ALL")) {
-            filtered = filtered.stream()
-                    .filter(job -> job.job_site.trim().equalsIgnoreCase(jobSite.trim()))
-                    .toList();
-        }
-
-        // filter company
-        List<String> companies = Arrays
-                .stream(mainFilter.companySearch.split(","))
-                .filter(s -> !s.isBlank())
-                .map(WebController::clean)
-                .toList();
-
-        if (!companies.isEmpty()) {
-            filtered = filtered.stream()
-                    .filter(job -> {
-                        for (String company : companies) {
-                            if (clean(job.company).contains(company)) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    }).toList();
-        }
-
-        // filter search term
-        List<String> searchTerms = Arrays
-                .stream(mainFilter.searchTerms.split(","))
-                .filter(s -> !s.isBlank())
-                .toList();
-
-        if (!searchTerms.isEmpty()) {
-            filtered = filtered.stream()
-                    .filter(job -> {
-                        String desc = job.description.toLowerCase();
-                        for (String term : searchTerms) {
-                            if (desc.contains(clean(term))) {
-                                return true;
-                            }
-                            if (clean(job.title).contains(clean(term))) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    })
-                    .toList();
-        }
-
-        // filter title
-        List<String> titleSearchTerms = Arrays
-                .stream(mainFilter.titleSearch.split(","))
-                .filter(s -> !s.isBlank())
-                .toList();
-
-        if (!titleSearchTerms.isEmpty()) {
-            filtered = filtered.stream()
-                    .filter(job -> {
-                        for (String term : titleSearchTerms) {
-                            if (clean(job.title).contains(clean(term))) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    })
-                    .toList();
-        }
-
-
-        // highlight search term
-        highlight(searchTerms, filtered);
-
-        // sort
-        filtered = filtered.stream()
-                .sorted((o1, o2) -> o1.company.compareToIgnoreCase(o2.company))
-                .toList();
-
-        return filtered;
+    private static MainFilter filter(Context ctx) {
+        return MainFilter.of(param(ctx, "status", "new"), param(ctx, "site", "all"), param(ctx, "q", ""));
     }
 
-    private void augmentCompanies(List<Job> jobs) {
-        // add statuses to each company
-
-        Map<String, Set<String>> comps = new HashMap<>();
-
-        for (Job job : jobs) {
-            String comp = job.company;
-            String status = job.status;
-            if (comps.containsKey(comp)) {
-                comps.get(comp).add(status);
-            } else {
-                comps.put(comp, new HashSet<>());
-                comps.get(comp).add(status);
-            }
-        }
-
-        for (Job job : jobs) {
-            Set<String> statuses = comps.get(job.company);
-            job.companyStatuses = statuses.stream().toList();
-        }
+    private static String param(Context ctx, String name, String defaultValue) {
+        String value = ctx.queryParam(name);
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 
-    private void highlight(List<String> searchTerms, List<Job> filtered) {
-        if (searchTerms.isEmpty()) return;
-        if (filtered.isEmpty()) return;
-
-        for (String searchTerm : searchTerms) {
-            String pattern = "(?i)" + Pattern.quote(searchTerm.trim());
-            String st = "<span class=\"highlight\">" + searchTerm + "</span>";
-            // for each search term
-            for (Job job : filtered) {
-                job.description = job.description.replaceAll(pattern, st);
-            }
-        }
-    }
-
-    private static String clean(String s) {
-        return s.trim().toLowerCase(Locale.ROOT);
+    private static String encode(String s) {
+        return URLEncoder.encode(s, StandardCharsets.UTF_8);
     }
 }

@@ -1,80 +1,149 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Titles</title>
     <link rel="stylesheet" href="/styles.css">
-    <style>
-    </style>
 </head>
 
-<body>
-<div class="container">
-    <nav>
-        <a th:href="@{/}">home</a> -
-        <a th:href="@{/titles}">titles</a>
-        <hr>
+<body class="titles-page">
+
+<header class="bar">
+    <nav class="bar__row" aria-label="Pages">
+        <a class="bar__home" href="/">Jobs</a>
+        <a class="tab tab--active" href="/titles" aria-current="page">
+            <span>New titles</span>
+            <span class="tab__count" id="count" th:text="${jobs.size()}">0</span>
+        </a>
     </nav>
-    <div class="filter">
-        <fieldset>
-            <legend>Filters</legend>
-            <form action="#" th:action="@{/titles}" th:object="${filter}" method="post">
-                <div>
-                    <div class="filter__form-input">
-                        <label for="titleSearch">Title Search</label>
-                        <input type="text" name="titleSearch" id="titleSearch" th:value="*{titleSearch}"/>
-                    </div>
-                    <input type="submit" value="Search">
-                </div>
-            </form>
-        </fieldset>
+
+    <div class="bar__row">
+        <form class="search" action="/titles" method="get">
+            <label class="sr-only" for="title">Search titles</label>
+            <input id="title" name="title" type="search" autocomplete="off" th:value="${filter.titleSearch}"
+                   placeholder="backend, platform, java">
+            <kbd>/</kbd>
+        </form>
     </div>
+</header>
 
-    <div class="jobs-found">
-        Jobs Found: <span id="counter" th:text="${jobs.size()}"></span>
-    </div>
-
-    <div th:each="job:${jobs}">
-        <div th:id="${'job-' + job.id}">
-
-            <div class="title__link-action">
-                <button class="button-link" type="submit" name="declined" value="declined" th:data-id="${job.id}"
-                        data-status="declined" onclick="removeTitle(event)">declined
-                </button>
+<main class="titles">
+    <ol class="titles__list" id="list" aria-label="New job titles">
+        <li th:each="job : ${jobs}" class="title-row" th:attr="data-id=${job.id},data-url=${job.url}">
+            <div class="title-row__text">
+                <a class="title-row__title" th:href="${job.url}" target="_blank" rel="noopener"
+                   th:text="${job.title}">Senior Java Engineer</a>
+                <span class="title-row__meta">
+                    <span th:text="${job.company}">Acme</span>
+                    · <span th:text="${sites[job.job_site]} ?: ${job.job_site}">Indeed</span>
+                </span>
             </div>
-            <div class="title__link-action">
-                <button class="button-link" type="submit" name="interested" value="interested" th:data-id="${job.id}"
-                        data-status="interested" onclick="removeTitle(event)">interested
-                </button>
+            <div class="title-row__actions">
+                <button type="button" class="action" data-status="declined">Decline <kbd>d</kbd></button>
+                <button type="button" class="action" data-status="interested">Interested <kbd>i</kbd></button>
             </div>
+        </li>
+        <li th:if="${jobs.isEmpty()}" class="list__empty">No new titles match.</li>
+    </ol>
+</main>
 
-            <a th:href="${job.url}" th:text="${job.title}" target="_blank"></a>
-        </div>
-    </div>
-</div>
-</body>
+<footer class="hints">
+    <span><kbd>j</kbd> <kbd>k</kbd> next / previous</span>
+    <span><kbd>d</kbd> decline</span>
+    <span><kbd>i</kbd> interested</span>
+    <span><kbd>o</kbd> open posting</span>
+    <span><kbd>/</kbd> search</span>
+    <span><kbd>esc</kbd> leave search</span>
+</footer>
+
 <script>
+    const list = document.getElementById('list')
+    const search = document.getElementById('title')
+    const count = document.getElementById('count')
+    let selected = null
 
-    function decreaseCounter() {
-        let counter = document.getElementById('counter')
-        let count = counter.innerHTML
-        count = parseInt(count)
-        count = count - 1
-        counter.innerHTML = count
+    function rows() {
+        return Array.from(list.querySelectorAll('.title-row'))
     }
 
-    function removeTitle(e) {
-        e.preventDefault()
-        let status = e.target.dataset.status
-        let id = parseInt(e.target.dataset.id)
+    function select(row) {
+        if (!row) return
+        if (selected) {
+            selected.classList.remove('title-row--selected')
+            selected.removeAttribute('aria-current')
+        }
+        selected = row
+        row.classList.add('title-row--selected')
+        row.setAttribute('aria-current', 'true')
+        row.scrollIntoView({block: 'nearest'})
+    }
 
-        fetch('/status/' + id + '/' + status, {
-            method: 'POST'
-        }).then((response) => {
-            if (response.ok) {
-                decreaseCounter()
-                document.querySelector('#job-' + id).remove()
+    function move(by) {
+        const all = rows()
+        select(all[all.indexOf(selected) + by])
+    }
+
+    // Save the new status, take the title out of the list, and move on to the next one.
+    function setStatus(row, status) {
+        if (!row) return
+
+        fetch('/status/' + row.dataset.id + '/' + status, {method: 'POST'}).then(response => {
+            if (!response.ok) return
+
+            const all = rows()
+            const index = all.indexOf(row)
+            const next = all[index + 1] || all[index - 1]
+            row.remove()
+            count.textContent = parseInt(count.textContent) - 1
+
+            if (row === selected) {
+                selected = null
+                select(next)
             }
         })
     }
+
+    list.addEventListener('click', event => {
+        const row = event.target.closest('.title-row')
+        if (!row) return
+
+        const button = event.target.closest('button[data-status]')
+        if (button) {
+            setStatus(row, button.dataset.status)
+        } else if (!event.target.closest('a')) {
+            select(row)
+        }
+    })
+
+    document.addEventListener('keydown', event => {
+        if (event.metaKey || event.ctrlKey || event.altKey) return
+
+        if (event.target.matches('input, textarea, select')) {
+            if (event.key === 'Escape') event.target.blur()
+            return
+        }
+
+        if (event.key === '/') {
+            event.preventDefault()
+            search.focus()
+            search.select()
+        } else if (event.key === 'j' || event.key === 'ArrowDown') {
+            event.preventDefault()
+            move(1)
+        } else if (event.key === 'k' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            move(-1)
+        } else if (event.key === 'd') {
+            setStatus(selected, 'declined')
+        } else if (event.key === 'i') {
+            setStatus(selected, 'interested')
+        } else if (event.key === 'o') {
+            if (selected) window.open(selected.dataset.url, '_blank', 'noopener')
+        }
+    })
+
+    select(rows()[0])
 </script>
+</body>
 </html>

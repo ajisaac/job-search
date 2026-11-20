@@ -1,0 +1,27 @@
+<!-- One job's details. Not a full page: the main page loads it into its right hand pane. -->
+<article class="job-detail" xmlns:th="http://www.thymeleaf.org">
+    <h2 class="job-detail__title">
+        <a th:href="${job.url}" target="_blank" rel="noopener" th:text="${job.title}">Senior Java Engineer</a>
+    </h2>
+
+    <p class="job-detail__meta">
+        <span th:text="${job.company.isBlank() ? 'Unknown company' : job.company}">Acme</span>
+        · <span th:text="${siteLabel}">We Work Remotely</span>
+        <th:block th:if="${job.job_posting_date != null}">· scraped <span th:text="${job.job_posting_date}"></span></th:block>
+        <th:block th:unless="${others.isEmpty()}">
+            · also posted <span th:text="${others.size()}">2</span> other<th:block th:if="${others.size() != 1}">s</th:block>:
+            <th:block th:each="other, it : ${others}"><span th:class="|status status--${other}|" th:text="${other}">later</span><th:block th:unless="${it.last}">, </th:block></th:block>
+        </th:block>
+    </p>
+
+    <div class="job-detail__actions">
+        <button th:each="status : ${statuses}" th:if="${status != job.status}" type="button" class="action"
+                th:attr="data-status=${status},data-key=${keys[status]}">
+            <span th:text="${#strings.capitalize(status)}">Interested</span>
+            <kbd th:text="${keys[status]}">i</kbd>
+        </button>
+        <a class="action" th:href="${job.url}" target="_blank" rel="noopener">Open <kbd>o</kbd></a>
+    </div>
+
+    <div class="job-detail__description" th:utext="${description}"></div>
+</article>

@@ -1,0 +1,43 @@
+{
+  "manifest_version": 2,
+  "name": "Job capture",
+  "version": "1.0",
+  "description": "Sends the job pages you browse to your local jobs webapp.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "job-capture@localhost"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/*",
+        "*://*.indeed.com/*",
+        "*://*.wellfound.com/*",
+        "*://*.glassdoor.com/*",
+        "*://*.workatastartup.com/*",
+        "*://*.welcometothejungle.com/*",
+        "*://*.otta.com/*",
+        "*://*.remote.co/*",
+        "*://*.greenhouse.io/*",
+        "*://jobs.lever.co/*",
+        "*://jobs.ashbyhq.com/*"
+      ],
+      "js": ["capture.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_action": {
+    "default_title": "Job capture",
+    "default_popup": "popup/popup.html"
+  }
+}

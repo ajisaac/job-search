@@ -1,56 +1,44 @@
 package co.aisaac.webapp;
 
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
+import io.javalin.http.Context;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
-@Controller
 public class TitlesController {
 
-    private final JobRepo jobRepo;
+    private final Jobs jobRepo;
 
-    private TitlesFilter filter;
-
-    public TitlesController(JobRepo jobRepo) {
+    public TitlesController(Jobs jobRepo) {
         this.jobRepo = jobRepo;
-        this.filter = new TitlesFilter();
     }
 
-    @GetMapping("/titles")
-    public String all(Model model) {
+    // GET /titles?title=backend, platform
+    // Every new job's title, for quickly declining or marking interested. Comma separated title terms, any match.
+    public void all(Context ctx) {
+        TitlesFilter filter = new TitlesFilter();
+        String title = ctx.queryParam("title");
+        filter.titleSearch = title == null ? "" : title;
+
+        List<String> terms = Arrays.stream(filter.titleSearch.split(","))
+                .map(term -> term.trim().toLowerCase(Locale.ROOT))
+                .filter(term -> !term.isEmpty())
+                .toList();
+
         List<Job> jobs = jobRepo.findAllByStatusOrderByTitle("new");
 
-
-        // Remove indeed from title
-        for (Job job : jobs) {
-            String indeed = " - Indeed.com";
-            if (!job.title.endsWith(indeed)) {
-                continue;
-            }
-
-            int trimTo = job.title.lastIndexOf("-", job.title.length() - indeed.length() - 1);
-            job.setTitle(job.title.substring(0, trimTo));
-        }
-
-        if (!filter.titleSearch.isBlank()) {
+        if (!terms.isEmpty()) {
             jobs = jobs.stream()
-                    .filter(job -> job.title.toLowerCase().contains(filter.titleSearch.toLowerCase()))
+                    .filter(job -> terms.stream().anyMatch(job.title.toLowerCase(Locale.ROOT)::contains))
                     .toList();
         }
 
-        model.addAttribute("jobs", jobs);
-        model.addAttribute("filter", filter);
-
-        return "titles";
-    }
-
-
-    @PostMapping("/titles")
-    public String searchTitles(TitlesFilter filter) {
-        this.filter = filter;
-        return "redirect:/titles";
+        ctx.render("templates/titles.html", Map.of(
+                "jobs", jobs,
+                "filter", filter,
+                "sites", Job.SITES
+        ));
     }
 }
